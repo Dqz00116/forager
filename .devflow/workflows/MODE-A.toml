@@ -1,0 +1,71 @@
+# MODE-A: Feature Development Workflow (v3.0)
+# Architect/Subagent execution model
+# Version: 3.0
+# File naming: All files use {workflow_run_id} variable
+
+[workflow]
+id = "MODE-A"
+name = "Feature Development Workflow"
+description = "Complete feature development from requirement to delivery using architect/subagent model"
+version = "3.0"
+
+# Step 0: Create Requirement (autonomous)
+[[steps]]
+id = "req-create"
+name = "Create Requirement"
+prompt_file = "mode-a/req-create.md"
+gates = ["file_exists:docs/requirements/REQ-{workflow_run_id}.md"]
+next = "req-approve"
+
+# Step 1: Approve Requirement (HUMAN CONFIRMATION REQUIRED)
+[[steps]]
+id = "req-approve"
+name = "Approve Requirement"
+prompt_file = "mode-a/req-approve.md"
+gates = [
+    "file_exists:docs/requirements/REQ-{workflow_run_id}.md",
+    "file_contains:docs/requirements/REQ-{workflow_run_id}.md:status: approved",
+    "file_exists:docs/features/FEAT-{workflow_run_id}.md",
+]
+next = "brainstorm"
+
+# Step 2: Brainstorm Design (HUMAN CONFIRMATION REQUIRED)
+[[steps]]
+id = "brainstorm"
+name = "Brainstorm Design Solutions"
+prompt_file = "mode-a/brainstorm.md"
+gates = ["file_exists:docs/superpowers/specs/DESIGN-{workflow_run_id}.md"]
+next = "write-plan"
+
+# Step 3: Write Implementation Plan (autonomous with plan-spec review)
+[[steps]]
+id = "write-plan"
+name = "Write Implementation Plan"
+prompt_file = "mode-a/write-plan.md"
+gates = [
+    "file_exists:docs/superpowers/plans/PLAN-{workflow_run_id}.md",
+    "state_set:review_plan_spec_consistency_passed",
+]
+next = "implement-verify"
+
+# Step 4: Implement + Verify (autonomous, merged from 4 old steps)
+[[steps]]
+id = "implement-verify"
+name = "Implement and Verify"
+prompt_file = "mode-a/implement-verify.md"
+gates = [
+    "command_success:{test_command}",
+    "file_exists:docs/evidence/EVIDENCE-{workflow_run_id}.md",
+]
+next = "finish"
+
+# Step 5: Finish (autonomous)
+[[steps]]
+id = "finish"
+name = "Finish and Deliver"
+prompt_file = "mode-a/finish.md"
+gates = [
+    "file_exists:docs/completion/COMPLETION-{workflow_run_id}.md",
+    "file_contains:docs/requirements/REQ-{workflow_run_id}.md:status: done",
+]
+next = ""

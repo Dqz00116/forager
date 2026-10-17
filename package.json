@@ -1,0 +1,40 @@
+{
+  "name": "pi-crawler",
+  "version": "0.1.0",
+  "description": "pi-agent 驱动的探索式智能爬虫 MVP",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "keywords": [
+    "crawler",
+    "agent",
+    "pi",
+    "llm",
+    "playwright"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "crawl": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:gate": "vitest run test/units.test.ts",
+    "trace": "tsx src/trace-query.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "^1.2.0",
+    "@earendil-works/pi-ai": "^1.2.0",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "playwright": "^1.64.1",
+    "turndown": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/turndown": "^5.0.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^5.0.4"
+  }
+}

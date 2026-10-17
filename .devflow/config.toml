@@ -1,0 +1,25 @@
+[project]
+name = "pi-crawler"
+language = "typescript"
+stack = "Node.js + TypeScript"
+version = "0.1.0"
+
+[commands]
+test = "npm run test:gate"
+lint = "npm run typecheck"
+build = ""
+test_unit = ""
+test_integration = ""
+
+[paths]
+src = "src"
+tests = "tests"
+docs = "docs"
+
+[constraints]
+zero_warnings = true
+zero_mocks = true
+nullable = true
+
+[workflow]
+stages = [ "backlog", "analyzing", "analyzed", "approved", "in_progress", "done",]

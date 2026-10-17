@@ -1,0 +1,83 @@
+# MODE-B: Debug Workflow (v3.0)
+# Architect/Subagent execution model
+# Version: 3.0
+# File naming: All files use {workflow_run_id} variable
+
+[workflow]
+id = "MODE-B"
+name = "Debug Workflow"
+description = "Systematic debugging using architect/subagent model"
+version = "3.0"
+extends = []
+
+# Phase 1: Root Cause Investigation (autonomous)
+[[steps]]
+id = "debug-root-cause"
+name = "Root Cause Investigation"
+prompt_file = "mode-b/debug-root-cause.md"
+gates = ["file_exists:docs/debug/ROOT-CAUSE-{workflow_run_id}.md"]
+next = "debug-pattern"
+
+# Phase 2: Pattern Analysis (autonomous)
+[[steps]]
+id = "debug-pattern"
+name = "Pattern Analysis"
+prompt_file = "mode-b/debug-pattern.md"
+gates = ["file_exists:docs/debug/PATTERN-{workflow_run_id}.md"]
+next = "debug-hypothesis"
+
+# Phase 3: Hypothesis & Testing (autonomous, fail → back to root-cause)
+[[steps]]
+id = "debug-hypothesis"
+name = "Form and Test Hypothesis"
+prompt_file = "mode-b/debug-hypothesis.md"
+gates = ["file_exists:docs/debug/HYPOTHESIS-{workflow_run_id}.md"]
+next = "debug-fix"
+
+[[steps.fail_route]]
+min_fails = 1
+target = "debug-root-cause"
+
+# Phase 4: Fix Implementation (autonomous, fail 1-2→root-cause, fail 3+→question)
+[[steps]]
+id = "debug-fix"
+name = "Implement Fix"
+prompt_file = "mode-b/debug-fix.md"
+gates = ["command_success:{test_command}"]
+next = "debug-verify"
+
+[[steps.fail_route]]
+min_fails = 1
+max_fails = 2
+target = "debug-root-cause"
+
+[[steps.fail_route]]
+min_fails = 3
+target = "debug-question"
+
+# Phase 4.5: Question Architecture (HUMAN CONFIRMATION REQUIRED)
+[[steps]]
+id = "debug-question"
+name = "Question Architecture"
+prompt_file = "mode-b/debug-question.md"
+gates = ["user_approved:ARCHITECTURE-REVIEW-{workflow_run_id}"]
+next = "debug-root-cause"
+
+# Phase 5: Verify Fix (autonomous)
+[[steps]]
+id = "debug-verify"
+name = "Verify Fix"
+prompt_file = "mode-b/debug-verify.md"
+gates = [
+    "file_exists:docs/debug/VERIFICATION-{workflow_run_id}.md",
+    "command_success:{test_command}",
+]
+next = "debug-finish"
+
+# Phase 6: Complete Debug (autonomous, auto → MODE-A:write-plan)
+[[steps]]
+id = "debug-finish"
+name = "Complete Debug"
+prompt_file = "mode-b/debug-finish.md"
+gates = ["file_exists:docs/debug/SUMMARY-{workflow_run_id}.md"]
+next = "MODE-A:write-plan"

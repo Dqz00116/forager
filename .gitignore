@@ -1,0 +1,36 @@
+node_modules/
+dist/
+
+# env：保留 example
+.env
+.env.*
+!.env.example
+
+# 运行数据 / trace（含 WAL、临时测试库）
+output/
+*.db
+*.db-wal
+*.db-shm
+
+# 日志
+*.log
+
+# devflow 本机运行状态（config/prompts/workflows 保留跟踪）
+.devflow/state.toml
+.devflow/state.toml.*.bak
+
+# 测试/构建产物
+coverage/
+test-results/
+playwright-report/
+blob-report/
+*.tsbuildinfo
+
+# 临时与系统文件
+tmp/
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
