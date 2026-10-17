@@ -1,99 +1,139 @@
-# pi-crawler
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./Resources/Brand/forager-wordmark-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./Resources/Brand/forager-wordmark-light.svg">
+    <img src="./Resources/Brand/forager-wordmark-light.svg" width="520" alt="Forager">
+  </picture>
+</p>
 
-pi-agent 作为大脑全程驱动的探索式网页爬虫：LLM agent 自主决定抓哪个页面、是否动态渲染、抽取什么数据，并通过工具保存记录。
+<p align="center">
+  One prompt, any website — an LLM agent that forages the web, asks for your help when it hits a wall, and learns to forge its own tools.
+</p>
 
-## 设计哲学
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.1.0-8b5cf6?style=flat-square" alt="version">
+  <img src="https://img.shields.io/badge/node-%3E%3D22-3c873a?style=flat-square" alt="node">
+  <img src="https://img.shields.io/badge/license-MPL--2.0-blue?style=flat-square" alt="license">
+  <img src="https://img.shields.io/badge/pi--agent-powered-0d9488?style=flat-square" alt="pi-agent">
+</p>
 
-- **不求全面，但求精细**：不堆砌功能与工具数量，而是把每个动作做扎实，让 agent 用最少的原语完成最多的任务。
-- **第一性原理**：回归"抓取"这件事的本质——无论站点如何千变万化，爬虫的原子动作只有三个：取（Fetch）、懂（Extract）、存（Save）。一切工具切分都回归这三个动作，拒绝按技术实现冗余拆分。
-- **三本质动作**：策略差异（静态 vs 渲染、确定性 vs 语义抽取）内化为工具参数，而非并列成多个工具。agent 根据具体任务自主组合取/懂/存，即可完成任意抓取任务。
+<p align="center">
+  English | <a href="./README_zh.md">简体中文</a>
+</p>
 
-## 使用
+---
 
-1. 填写 `.env`：
+### Overview
 
-   ```
-   OPENCODE_API_KEY=你的 OpenCode Go 密钥
-   CRAWLER_MODEL=muse-spark-1.3
-   ```
+Forager turns a URL and a single sentence of natural language into a running web-scraping agent. Instead of you hand-writing selectors and pagination logic, an LLM agent — built on `pi-agent-core` and `muse-spark` — explores the site itself: it fetches pages, reads them, follows links, decides what to extract, and saves structured records. Everything it does goes through four essential tools: **fetch** (get), **extract** (understand), **save** (keep), and **request_human** (ask). When it hits a login wall, a CAPTCHA, or a slider, it hands the browser to you, then detects when you are done and takes over automatically — no Enter key required. Every prompt, response, and tool call is recorded to SQLite, so any run can be replayed and audited.
 
-2. 安装依赖并下载 chromium：
+### Architecture
 
-   ```bash
-   npm install
-   npx playwright install chromium
-   ```
+```mermaid
+flowchart LR
+    A["URL + prompt"] --> B["Forager agent<br/>pi-agent-core + muse-spark"]
+    B --> C["fetch<br/>static / rendered"]
+    C --> D["extract<br/>CSS or LLM semantics"]
+    D --> E["save<br/>schema · dedup · provenance"]
+    C -.-> F["request_human<br/>headed browser · poll"]
+    F -.-> C
+    E --> G[("structured data<br/>output/records.jsonl")]
+    B -.-> H[("SQLite trace<br/>output/trace.db")]
+```
 
-3. 运行爬虫任务：
+### Why Forager?
 
-   ```bash
-   npm run crawl -- <入口URL> "<任务描述>"
-   ```
+**It asks for help.** Most crawlers treat a login wall or a slider CAPTCHA as a hard failure, then retry blindly or rotate proxies. Forager treats the human as part of the system. Its fourth essential tool, `request_human`, opens a headed browser on the exact page that is blocking it, tells you what to do, and then polls for completion — a success selector, a URL that is no longer the login page, or simply the window being closed. The moment you finish, the agent resumes in the same browser context with your cookies and session intact. No Enter key, no terminal babysitting, and it works even in unattended/background runs.
 
-   例如：
+**It will forge its own tools.** Sites protected by aggressive anti-bot systems (BOSS Zhipin, for example) are not worth brute-forcing through a renderer. The planned P4 layer lets the agent notice that pattern, write a small API-level tool for that specific site, and keep it in a persistent toolbox. This is a roadmap item — `forge_tool`, `run_dynamic_tool`, and toolbox persistence are **coming soon**; today's agent works with the four essential tools.
 
-   ```bash
-   npm run crawl -- https://example.com/news "抓取前 3 页新闻列表，进入每条详情页保存标题、日期和摘要"
-   ```
+**Observable by default.** Every run writes a complete trace to SQLite via `node:sqlite` — zero extra dependencies. Every LLM prompt and response in full, every tool call with its arguments, result, duration, error status, and whether it actually persisted a record. `npm run trace` lists runs, replays an event stream, or filters for patterns like "extracted something but never saved it." When the agent behaves strangely, you can prove why.
 
-抓取到的结构化记录逐行追加在 `output/records.jsonl`（JSON Lines 格式）。
+**Just three verbs.** Crawling looks infinitely varied, but stripped to first principles it is only: get a page, understand it, keep what matters. Forager refuses to grow a tool per technique. Static vs. rendered fetching is a parameter of `fetch`; deterministic CSS extraction vs. semantic LLM extraction is a parameter of `extract`. Strategy lives in arguments, not in an ever-growing toolbox — so the agent composes three verbs into any scraping task.
 
-## 可观测性 / Trace
+### How it works
 
-每次 `npm run crawl` 都会自动把本次运行的全量 trace 记录到 `output/trace.db`（`node:sqlite`，零新增依赖）。CLI 结束时打印本次 `run_id` 与查询提示。
+The four essential tools, each with strategy folded into its parameters:
 
-trace 内容：
+- **`fetch(url, render?)`** — Retrieves a page and the links inside it. Static by default; pass `render=true` to re-fetch through headless Chromium when the content is missing or JS-gated. Returned `links` are how the agent finds "next page" and paginates — pagination is part of fetching, not a separate tool.
+- **`extract(content, instruction, selector?)`** — Understands a page. With a CSS `selector` (including `::attr(x)`) it uses cheerio for fast, zero-model-cost extraction; without one it follows the natural-language `instruction` through LLM semantic extraction.
+- **`save(data, schema?, dedup_key?, source_url?)`** — Enforces a data contract: missing required fields are rejected (`schema_missing`), duplicate `dedup_key`s are skipped (`duplicate`), and all-empty records are filtered (`all_empty`). `source_url` provides provenance and doubles as the default dedup key.
+- **`request_human(reason, url, wait_mode)`** — Asks a person to log in, solve a CAPTCHA, or drag a slider, then waits for an objective completion signal (`success_selector`, `gone_url_pattern`, …) or for the window to close.
 
-- run 元信息：入口 url / task / 状态 / 耗时 / 落盘数（`records_saved`）
-- 每次 LLM 交互的完整 prompt 与 response（全量，不截断决策依据）
-- 每次工具调用：args / 结果 / 耗时 / 是否落盘（`saved`），以及是否报错
+A single crawl is a loop: the agent fetches the entry URL, reads the page and its links, extracts the fields your prompt asked for, saves them under the data contract, and decides whether to follow a link and repeat. `list_saved` reports how many records are on disk, and `finish` ends the run when the task is complete. The whole loop is recorded as it happens.
 
-查询命令：
+### Quick start
+
+Requires **Node >= 22.19**.
 
 ```bash
-# 列出所有运行（按时间）
+npm install
+npx playwright install chromium
+```
+
+Create a `.env` in the project root:
+
+```dotenv
+OPENCODE_API_KEY=your_opencode_go_key
+# optional, defaults to muse-spark-1.3-contributor
+CRAWLER_MODEL=muse-spark-1.3-contributor
+```
+
+Run a task:
+
+```bash
+npm run crawl -- <url> "<task>"
+```
+
+For example:
+
+```bash
+npm run crawl -- https://quotes.toscrape.com "Collect the first 3 pages of quotes with author and tags"
+```
+
+Records are appended as JSON Lines to `output/records.jsonl`, and the run's trace goes to `output/trace.db`.
+
+### Observability
+
+Each run prints its `run_id` when it finishes:
+
+```bash
+# List all runs, newest first
 npm run trace
 npm run trace -- runs
 
-# 回放某次运行的完整事件流
+# Replay the full event stream of one run
 npm run trace -- run <run_id>
 
-# 查「extract 有产出但没 save」的运行
+# Find runs that extracted data but never saved it
 npm run trace -- --pattern extract-no-save
 
-# 指定其他 trace 库
+# Point at a different trace database
 npm run trace -- --db <path>
 ```
 
-trace 是排查"agent 为什么没存数据 / 行为异常"的入口：行为可观测，根因可证。
+The trace holds run metadata (entry URL, task, status, duration, `records_saved`), the complete prompt and response of every LLM interaction, and every tool call with arguments, results, timing, errors, and whether it produced a saved record.
 
-## 本质工具
+### Verified on
 
-爬虫内核固化为三个本质工具，策略差异内化为参数：
+Real sites, real runs — no mocks in the test suite:
 
-**取 fetch(url, render?)**
-- 输入 URL，返回页面内容与其中链接；`links` 可用于识别"下一页"等分页并再次调用 `fetch` 翻页（分页内化于取，非独立工具）。
-- 默认静态抓取；失败或返回内容明显不足时，改传 `render=true` 走无头浏览器渲染重取。
+| Site | What it exercises |
+| --- | --- |
+| [quotes.toscrape.com](https://quotes.toscrape.com) / [books.toscrape.com](https://books.toscrape.com) | Multi-page pagination, listing + detail extraction |
+| [Hacker News](https://news.ycombinator.com) | Link ranking structures, static HTML |
+| [GitHub Trending](https://github.com/trending) | Dynamically rendered content, repo metadata |
+| [量子位 (QbitAI)](https://www.qbitai.com) | Chinese news site, article extraction |
+| [知乎 (Zhihu)](https://www.zhihu.com) | Login wall — `request_human` handoff, session reuse |
+| [BOSS直聘 (BOSS Zhipin)](https://www.zhipin.com) | Slider CAPTCHA + anti-bot risk control |
 
-**懂 extract(content, instruction, selector?)**
-- 输入页面内容与抽取意图。给了 `selector`（CSS 选择器，支持 `::attr(x)` 后缀）走 cheerio 确定性提取，快速、零模型成本；不给 `selector` 则按 `instruction` 走 LLM 语义抽取。
+**A real-API test suite (no mocks)** — run `npm test`.
 
-**存 save(data, schema?, dedup_key?, source_url?)**
-- 数据契约：缺字段拒绝（`schema_missing`）、同 `dedup_key` 跳过（`duplicate`）、内容全空过滤（`all_empty`）。
-- `source_url` 用于溯源，并作为默认去重键（`dedup_key` 缺省时等价于 `'url'`）。
+### Roadmap
 
-辅助工具：`list_saved`（查看已存记录数与路径）、`finish`（宣告任务完成）。
+- **P4 — adaptive tool forging**: `forge_tool` lets the agent write a site-specific tool when rendering is the wrong approach, `run_dynamic_tool` executes it, and a persistent `toolbox` keeps it for later runs. This is **not implemented yet**; Forager currently ships the four essential tools.
+- **Docker sandbox**: run forged tools in an isolated container.
 
-## 人机协作 / Human-in-the-Loop
+### License
 
-- **设计哲学**：承认 agent 的能力边界，把人当作系统的一个组件——agent 做擅长的探索、抽取、导航，人做擅长的登录、验证码、复杂交互与判断。不追求虚假的全自动，关键是 agent 知道"何时该求助、如何让人接手"。
-- **第 4 本质工具 request_human**：与取/懂/存并列。agent 遇到登录墙、验证码、权限墙、拖拽等需要人操作的场景时，主动发起求助并说明需要人做什么，而非卡死或盲目重试。
-- **交互流程**：agent 求助 → 弹出有头浏览器窗口显示目标页 → 你在窗口里完成操作（登录/验证码/拖拽）→ 回 CLI 按回车 → agent 在同一会话中继续抓取（同一浏览器上下文，登录态/Cookie 自然保留）。
-- **按需有头**：不需要人介入的任务，agent 仍以无头模式高效运行；有头窗口仅在求助时出现。
-- **全程可观测**：求助与接管都记入 trace，`npm run trace` 可查，人操作耗时以 `duration_ms` 记录。
-
-## 说明
-
-- 默认静态抓取；失败或内容为空时自动改用 playwright 无头浏览器渲染。
-- agent 可用工具：`fetch` / `extract` / `save` / `list_saved` / `finish`。
-- 模型经 OpenCode Go provider 调用，模型 ID 由 `.env` 的 `CRAWLER_MODEL` 配置。
+[MPL-2.0](./LICENSE)

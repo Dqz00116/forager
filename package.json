@@ -1,10 +1,10 @@
 {
-  "name": "pi-crawler",
+  "name": "forager",
   "version": "0.1.0",
-  "description": "pi-agent 驱动的探索式智能爬虫 MVP",
+  "description": "LLM agent that forages the web with four essential tools",
   "type": "module",
   "private": true,
-  "license": "MIT",
+  "license": "MPL-2.0",
   "keywords": [
     "crawler",
     "agent",

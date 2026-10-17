@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="150" viewBox="0 0 520 150" role="img" aria-labelledby="forager-wordmark-title">
+  <title id="forager-wordmark-title">Forager</title>
+  <g fill="#0d9488">
+    <!-- leaf held overhead -->
+    <path d="M46 24 C52 10 84 10 90 24 C84 38 52 38 46 24 Z" transform="rotate(-18 68 24)"/>
+    <!-- antennae -->
+    <path d="M63 55 C59 50 58 46 60 41" fill="none" stroke="#0d9488" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M73 55 C77 50 78 46 76 41" fill="none" stroke="#0d9488" stroke-width="4.5" stroke-linecap="round"/>
+    <!-- head, thorax, gaster -->
+    <circle cx="68" cy="66" r="12"/>
+    <ellipse cx="68" cy="92" rx="10" ry="13"/>
+    <ellipse cx="68" cy="122" rx="14" ry="15"/>
+    <!-- legs -->
+    <g fill="none" stroke="#0d9488" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M60 86 L46 78 L40 66"/>
+      <path d="M76 86 L90 78 L96 66"/>
+      <path d="M58 93 L44 95 L34 104"/>
+      <path d="M78 93 L92 95 L102 104"/>
+      <path d="M60 100 L50 112 L44 126"/>
+      <path d="M76 100 L86 112 L92 126"/>
+    </g>
+  </g>
+  <text x="132" y="109" fill="#1a1a1a" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="94" font-weight="700" letter-spacing="-1.5">Forager</text>
+</svg>
